@@ -10,6 +10,7 @@ let nextDrawAt = 0;
 let nextDrawDelayMs = 0;
 let remainingMs = 0;
 let gameState = "idle";
+let speechEnabled = true;
 
 const COUNTDOWN_RADIUS = 42;
 const COUNTDOWN_CIRCUMFERENCE = 2 * Math.PI * COUNTDOWN_RADIUS;
@@ -39,6 +40,7 @@ const updateActionButtons = () => {
 };
 
 const setGameState = (nextState) => {
+  const previousState = gameState;
   gameState = nextState;
   inCourse = nextState === "running";
 
@@ -48,11 +50,30 @@ const setGameState = (nextState) => {
   if (nextState === "finished") setStatus("Juego Terminado");
 
   updateActionButtons();
+
+  if (previousState !== nextState) {
+    speak($("#status")?.textContent || "");
+  }
 };
 
 const updateCurrent = () => {
   const currentEl = $("#currentNumber");
   if (currentEl) currentEl.textContent = currentNumber;
+};
+
+const speak = (text) => {
+  if (!speechEnabled || !("speechSynthesis" in window)) return;
+
+  const message = String(text || "").trim();
+  if (!message) return;
+
+  const utterance = new SpeechSynthesisUtterance(message);
+  utterance.lang = "es-ES";
+  utterance.rate = 0.9;
+  utterance.pitch = 1;
+
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
 };
 
 const updateTaken = () => {
@@ -147,6 +168,7 @@ const takeNumber = () => {
   numbersTaken.push(currentNumber);
 
   updateCurrent();
+  speak(currentNumber);
   updateTaken();
 
   if (numbersPosibles.length === 0) {
@@ -205,9 +227,11 @@ window.resumeGame = () => {
 
 const initializeCountdown = () => {
   const timerInput = $("#timer");
+  const speechInput = $("#speechEnabled");
   const initialMs = Math.max(0, (Number(timerInput?.value) || 0) * 1000);
 
   updateCountdown(initialMs, Math.max(1, initialMs));
+  speechEnabled = speechInput?.checked ?? true;
 
   timerInput?.addEventListener("input", () => {
     if (gameState !== "idle" && gameState !== "finished") return;
@@ -215,6 +239,13 @@ const initializeCountdown = () => {
     const previewMs = Math.max(0, (Number(timerInput.value) || 0) * 1000);
     remainingMs = previewMs;
     updateCountdown(previewMs, Math.max(1, previewMs));
+  });
+
+  speechInput?.addEventListener("change", () => {
+    speechEnabled = speechInput.checked;
+    if (!speechEnabled && "speechSynthesis" in window) {
+      window.speechSynthesis.cancel();
+    }
   });
 
   setGameState("idle");
